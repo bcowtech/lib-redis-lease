@@ -1,0 +1,8 @@
+.vscode
+.env
+
+# local environment shell script
+env.bat
+env.sh
+env.*.bat
+env.*.sh
