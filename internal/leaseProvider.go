@@ -41,25 +41,36 @@ if TIMESTAMP and TTL and LEASE_ID and WORKSPACE then
 	if WORKSPACE == "" then  return redis.error_reply("INVALID_ARGUMENT")  end
 	if LEASE_ID  == "" then  return redis.error_reply("INVALID_ARGUMENT")  end
 
+	local LAST_UPDATE_AT
 	local EXPIRE_AT = TIMESTAMP + TTL
 
 	do
-		local reply = redis.call('ZADD', WORKSPACE, EXPIRE_AT, LEASE_ID)
+		local reply = redis.call('HGET', LEASE_ID, "timestamp")
 		if type(reply)=='table' and reply.err then
 			return reply
 		end
+		LAST_UPDATE_AT = tonumber(reply)
 	end
 
-	do
-		local reply = redis.call('HSET' , LEASE_ID
-																		, "ttl", TTL)
-		if type(reply)=='table' and reply.err then
-			return reply
+	if not LAST_UPDATE_AT  or  TIMESTAMP > LAST_UPDATE_AT then
+		do
+			local reply = redis.call('ZADD', WORKSPACE, EXPIRE_AT, LEASE_ID)
+			if type(reply)=='table' and reply.err then
+				return reply
+			end
 		end
-		redis.call('HDEL', LEASE_ID, "expire_at")
-	end
 
-	return redis.status_reply("OK")
+		do
+			local reply = redis.call('HSET' , LEASE_ID
+																			, "ttl"      , TTL
+																			, "timestamp", TIMESTAMP)
+			if type(reply)=='table' and reply.err then
+				return reply
+			end
+		end
+
+		return redis.status_reply("OK")
+	end
 end
 return redis.status_reply("NOP")`, []string{workspace, lease}, ttl_ms, timestamp_ms)
 
@@ -91,15 +102,16 @@ if LEASE_ID and WORKSPACE then
 	if WORKSPACE == "" then  return redis.error_reply("INVALID_ARGUMENT")  end
 	if LEASE_ID  == "" then  return redis.error_reply("INVALID_ARGUMENT")  end
 
-	local TTL, EXPIRE_AT
+	local TTL, TIMESTAMP, EXPIRE_AT
 
 	do
 		local reply = redis.call('HMGET', LEASE_ID
-																		, "ttl")
+																		, "ttl"
+																		, "timestamp")
 		if type(reply)=='table' and reply.err then
 			return reply
 		end
-		TTL = unpack(reply)
+		TTL, TIMESTAMP = unpack(reply)
 	end
 
 	do
@@ -113,6 +125,7 @@ if LEASE_ID and WORKSPACE then
 	do
 		local result = {
 			ttl       = tonumber(TTL),
+			timestamp = tonumber(TIMESTAMP),
 			expire_at = tonumber(EXPIRE_AT),
 		}
 
@@ -156,9 +169,6 @@ local LEASE_ID  = KEYS[2]
 if LEASE_ID and WORKSPACE then
 	if WORKSPACE == "" then  return redis.error_reply("INVALID_ARGUMENT")  end
 	if LEASE_ID  == "" then  return redis.error_reply("INVALID_ARGUMENT")  end
-
-	local SHOULD_REMOVE_LEASE = true
-	local SHOULD_REMOVE_QUEUE = true
 
 	do
 		local reply = redis.call('DEL', LEASE_ID)
@@ -212,25 +222,47 @@ if TIMESTAMP and LEASE_ID and WORKSPACE then
 	if WORKSPACE == "" then  return redis.error_reply("INVALID_ARGUMENT")  end
 	if LEASE_ID  == "" then  return redis.error_reply("INVALID_ARGUMENT")  end
 
-	local TTL
+	local TTL, LAST_UPDATE_AT
 
 	do
-		local reply = redis.call('HGET', LEASE_ID, "ttl")
+		local reply = redis.call('HMGET', LEASE_ID
+																		, "ttl"
+																		, "timestamp")
 		if type(reply)=='table' and reply.err then
-			return reply
+		return reply
 		end
-		TTL = tonumber(reply)
+		TTL, LAST_UPDATE_AT = unpack(reply)
+
+		LAST_UPDATE_AT = tonumber(LAST_UPDATE_AT)
 	end
 
-	if TTL then
+	if TTL  and (not LAST_UPDATE_AT  or  TIMESTAMP > LAST_UPDATE_AT) then
 		local expire_at = TIMESTAMP + TTL
 
-		local reply = redis.call('ZADD', WORKSPACE, expire_at, LEASE_ID)
+		do
+			local reply  = redis.call('HSET', LEASE_ID
+																			, "timestamp", TIMESTAMP)
+			if type(reply)=='table' and reply.err then
+				return reply
+			end
+		end
+
+		do
+			local reply = redis.call('ZADD', WORKSPACE, expire_at, LEASE_ID)
+			if type(reply)=='table' and reply.err then
+				return reply
+			end
+			if reply then
+				RESULT =  expire_at
+			end
+		end
+	else
+		local reply = redis.call('ZSCORE', WORKSPACE, LEASE_ID)
 		if type(reply)=='table' and reply.err then
 			return reply
 		end
 		if reply then
-			RESULT =  expire_at
+			RESULT = tonumber(reply)
 		end
 	end
 end
@@ -266,24 +298,24 @@ local TIMESTAMP = tonumber(ARGV[1])
 local LIMIT
 
 if ARGV then
-  if (#ARGV - 1) % 2 ~= 0 then
-    return redis.error_reply("ILLEGAL_ARGUMENTS")
-  end
+	if (#ARGV - 1) % 2 ~= 0 then
+		return redis.error_reply("ILLEGAL_ARGUMENTS")
+	end
 
-  local ARGV_SETTER = {
-    LIMIT = function(v) LIMIT  = tonumber(v) end,
-  }
+	local ARGV_SETTER = {
+		LIMIT = function(v) LIMIT  = tonumber(v) end,
+	}
 
-  for i = 2, #ARGV, 2 do
-    local k = ARGV[i]
-    local setter = ARGV_SETTER[k]
-    if setter then
-      local err = setter(ARGV[i+1])
-      if err then
-        return err
-      end
-    end
-  end
+	for i = 2, #ARGV, 2 do
+		local k = ARGV[i]
+		local setter = ARGV_SETTER[k]
+		if setter then
+			local err = setter(ARGV[i+1])
+			if err then
+				return err
+			end
+		end
+	end
 end
 
 local RESULT
@@ -348,7 +380,7 @@ if TIMESTAMP and SINK and WORKSPACE then
 
 	RESULT = COUNT or 0
 end
-return RESULT`, []string{workspace, sink}, RedisArgs(timestamp_ms).NamedArguments(options...)...)
+return RESULT`, []string{workspace, sink}, redisArgs(timestamp_ms).NamedArguments(options...)...)
 
 	reply, err := cmd.Result()
 	if err != nil {

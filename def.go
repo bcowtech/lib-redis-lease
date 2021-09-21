@@ -3,6 +3,7 @@ package lease
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/bcowtech/lib-redis-lease/internal"
 	stream "github.com/bcowtech/lib-redis-stream"
@@ -23,12 +24,22 @@ type (
 	Timestamp = internal.Timestamp
 	LeaseArg  = internal.LeaseArg
 
-	RedisOption          = redis.Options
-	RedisErrorHandleProc = stream.RedisErrorHandleProc
-	StreamOffset         = stream.StreamOffset
+	RedisClient  = redis.Client
+	RedisOption  = redis.Options
+	StreamOffset = stream.StreamOffset
+
+	LeaseReaperHook interface {
+		OnPause(workspace, eventSink string)
+		OnProcess(workspace, eventSink string, timestamp time.Time)
+		OnResume(workspace, eventSink string)
+		OnStart()
+		OnStop()
+	}
 )
 
 // func
 type (
+	ErrorHandleProc = stream.RedisErrorHandleProc
+
 	EventHandleProc func(ev *Event) error
 )

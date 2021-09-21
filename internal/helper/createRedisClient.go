@@ -1,4 +1,4 @@
-package internal
+package helper
 
 import (
 	"fmt"
@@ -19,9 +19,4 @@ func CreateRedisClient(opt *redis.Options) (*redis.Client, error) {
 		}
 	}
 	return client, nil
-}
-
-func RedisArgs(args ...interface{}) RedisArgsBuilder {
-	var arg RedisArgsBuilder
-	return arg.Pack(args...)
 }

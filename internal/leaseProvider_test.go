@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bcowtech/lib-redis-lease/internal/helper"
 	"github.com/go-redis/redis/v7"
 )
 
 func TestLeaseProvider_Put(t *testing.T) {
-	client, err := CreateRedisClient(&redis.Options{
+	client, err := helper.CreateRedisClient(&redis.Options{
 		Addr: os.Getenv("REDIS_SERVER"),
 	})
 	if err != nil {
@@ -18,20 +19,34 @@ func TestLeaseProvider_Put(t *testing.T) {
 
 	p := new(LeaseProvider)
 	p.Init(client)
-	ok, err := p.Put("op/lease", "lease-1", 300*time.Millisecond, time.Date(2021, 9, 8, 16, 3, 4, 0, time.UTC))
-	if err != nil {
-		t.Fatal(err)
+	{
+		ok, err := p.Put("op/lease", "lease-1", 300*time.Millisecond, time.Date(2021, 9, 8, 16, 3, 4, 0, time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var expectedOK bool = true
+		if ok != expectedOK {
+			t.Errorf("expect %v, but got %v", expectedOK, ok)
+		}
 	}
-	var expectedOK bool = true
-	if ok != expectedOK {
-		t.Errorf("expect %v, but got %v", expectedOK, ok)
+
+	// duplicated operation
+	{
+		ok, err := p.Put("op/lease", "lease-1", 300*time.Millisecond, time.Date(2021, 9, 8, 16, 3, 4, 0, time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var expectedOK bool = false
+		if ok != expectedOK {
+			t.Errorf("expect %v, but got %v", expectedOK, ok)
+		}
 	}
 
 	client.Del("op/lease", "lease-1")
 }
 
 func TestLeaseProvider_Get(t *testing.T) {
-	client, err := CreateRedisClient(&redis.Options{
+	client, err := helper.CreateRedisClient(&redis.Options{
 		Addr: os.Getenv("REDIS_SERVER"),
 	})
 	if err != nil {
@@ -63,10 +78,14 @@ func TestLeaseProvider_Get(t *testing.T) {
 		if lease.TTL != expectedTTL {
 			t.Errorf("Lease.TTL: expect %v, but got %v", expectedTTL, lease.TTL)
 		}
+		var expectedTimestamp Timestamp = 1631116984000
+		if lease.Timestamp != expectedTimestamp {
+			t.Errorf("Lease.Timestamp: expect %v, but got %v", expectedTimestamp, lease.Timestamp)
+		}
 		if lease.ExpireAt == nil {
 			t.Errorf("Lease.ExpireAt: should not be nil")
 		} else {
-			var expectedExpireAt Timestamp = new(Timestamp).FromTime(time.Date(2021, 9, 8, 16, 3, 4, int(300*time.Millisecond), time.UTC)).Value()
+			var expectedExpireAt Timestamp = 1631116984300
 			if *lease.ExpireAt != expectedExpireAt {
 				t.Errorf("Lease.ExpireAt: expect %v, but got %v", expectedExpireAt, *lease.ExpireAt)
 			}
@@ -77,7 +96,7 @@ func TestLeaseProvider_Get(t *testing.T) {
 }
 
 func TestLeaseProvider_Delete(t *testing.T) {
-	client, err := CreateRedisClient(&redis.Options{
+	client, err := helper.CreateRedisClient(&redis.Options{
 		Addr: os.Getenv("REDIS_SERVER"),
 	})
 	if err != nil {
@@ -91,21 +110,36 @@ func TestLeaseProvider_Delete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok, err := p.Delete("op/lease", "lease-1")
-	if err != nil {
-		t.Fatal(err)
+	{
+		ok, err := p.Delete("op/lease", "lease-1")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var expectedOK bool = true
+		if ok != expectedOK {
+			t.Errorf("expect %v, but got %v", expectedOK, ok)
+		}
 	}
 
-	var expectedOK bool = true
-	if ok != expectedOK {
-		t.Errorf("expect %v, but got %v", expectedOK, ok)
+	// duplicated operation
+	{
+		ok, err := p.Delete("op/lease", "lease-1")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var expectedOK bool = false
+		if ok != expectedOK {
+			t.Errorf("expect %v, but got %v", expectedOK, ok)
+		}
 	}
 
 	client.Del("op/lease", "lease-1")
 }
 
 func TestLeaseProvider_Renew(t *testing.T) {
-	client, err := CreateRedisClient(&redis.Options{
+	client, err := helper.CreateRedisClient(&redis.Options{
 		Addr: os.Getenv("REDIS_SERVER"),
 	})
 	if err != nil {
@@ -119,21 +153,34 @@ func TestLeaseProvider_Renew(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expireAt, err := p.Renew("op/lease", "lease-1", time.Date(2021, 9, 8, 16, 3, 4, int(150*time.Millisecond), time.UTC))
-	if err != nil {
-		t.Fatal(err)
-	}
+	{
+		expireAt, err := p.Renew("op/lease", "lease-1", time.Date(2021, 9, 8, 16, 3, 4, int(150*time.Millisecond), time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	var expectedExpireAt Timestamp = new(Timestamp).FromTime(time.Date(2021, 9, 8, 16, 3, 4, int(450*time.Millisecond), time.UTC)).Value()
-	if expireAt != expectedExpireAt {
-		t.Errorf("expect %v, but got %v", expectedExpireAt, expireAt)
+		var expectedExpireAt Timestamp = 1631116984450
+		if expireAt != expectedExpireAt {
+			t.Errorf("expect %v, but got %v", expectedExpireAt, expireAt)
+		}
+	}
+	{
+		expireAt, err := p.Renew("op/lease", "lease-1", time.Date(2021, 9, 8, 16, 3, 4, int(150*time.Millisecond), time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var expectedExpireAt Timestamp = 1631116984450
+		if expireAt != expectedExpireAt {
+			t.Errorf("expect %v, but got %v", expectedExpireAt, expireAt)
+		}
 	}
 
 	client.Del("op/lease", "lease-1")
 }
 
 func TestLeaseProvider_Expire(t *testing.T) {
-	client, err := CreateRedisClient(&redis.Options{
+	client, err := helper.CreateRedisClient(&redis.Options{
 		Addr: os.Getenv("REDIS_SERVER"),
 	})
 	if err != nil {
@@ -162,7 +209,7 @@ func TestLeaseProvider_Expire(t *testing.T) {
 }
 
 func TestLeaseProvider_Expire_WithLimit(t *testing.T) {
-	client, err := CreateRedisClient(&redis.Options{
+	client, err := helper.CreateRedisClient(&redis.Options{
 		Addr: os.Getenv("REDIS_SERVER"),
 	})
 	if err != nil {

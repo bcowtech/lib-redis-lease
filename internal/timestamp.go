@@ -1,6 +1,9 @@
 package internal
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 //go:generate msgp -tests=false
 
@@ -32,6 +35,10 @@ func (ts *Timestamp) FromMilliseconds(ticks int64) *Timestamp {
 
 func (ts *Timestamp) Value() Timestamp {
 	return *ts
+}
+
+func (ts *Timestamp) String() string {
+	return fmt.Sprintf("%d", *ts)
 }
 
 func CurrentTimestamp() *Timestamp {

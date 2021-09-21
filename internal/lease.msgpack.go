@@ -26,10 +26,10 @@ func (z *Lease) DecodeMsg(dc *msgp.Reader) (err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
-		case "key":
+		case "id":
 			z.ID, err = dc.ReadString()
 			if err != nil {
-				err = msgp.WrapError(err, "Key")
+				err = msgp.WrapError(err, "ID")
 				return
 			}
 		case "ttl":
@@ -40,6 +40,12 @@ func (z *Lease) DecodeMsg(dc *msgp.Reader) (err error) {
 				return
 			}
 			z.TTL = time.Duration(v * int64(time.Millisecond))
+		case "timestamp":
+			err = z.Timestamp.DecodeMsg(dc)
+			if err != nil {
+				err = msgp.WrapError(err, "Timestamp")
+				return
+			}
 		case "expire_at":
 			if dc.IsNil() {
 				err = dc.ReadNil()
@@ -71,15 +77,15 @@ func (z *Lease) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *Lease) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 3
-	// write "key"
-	err = en.Append(0x83, 0xa3, 0x6b, 0x65, 0x79)
+	// map header, size 4
+	// write "id"
+	err = en.Append(0x84, 0xa2, 0x69, 0x64)
 	if err != nil {
 		return
 	}
 	err = en.WriteString(z.ID)
 	if err != nil {
-		err = msgp.WrapError(err, "Key")
+		err = msgp.WrapError(err, "ID")
 		return
 	}
 	// write "ttl"
@@ -90,6 +96,16 @@ func (z *Lease) EncodeMsg(en *msgp.Writer) (err error) {
 	err = en.WriteInt64(int64(z.TTL / time.Millisecond))
 	if err != nil {
 		err = msgp.WrapError(err, "TTL")
+		return
+	}
+	// write "timestamp"
+	err = en.Append(0xa9, 0x74, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70)
+	if err != nil {
+		return
+	}
+	err = z.Timestamp.EncodeMsg(en)
+	if err != nil {
+		err = msgp.WrapError(err, "Timestamp")
 		return
 	}
 	// write "expire_at"
@@ -115,13 +131,24 @@ func (z *Lease) EncodeMsg(en *msgp.Writer) (err error) {
 // MarshalMsg implements msgp.Marshaler
 func (z *Lease) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 3
-	// string "key"
-	o = append(o, 0x83, 0xa3, 0x6b, 0x65, 0x79)
+	// map header, size 4
+	// string "id"
+	o = append(o, 0x84, 0xa2, 0x69, 0x64)
 	o = msgp.AppendString(o, z.ID)
 	// string "ttl"
 	o = append(o, 0xa3, 0x74, 0x74, 0x6c)
 	o = msgp.AppendInt64(o, int64(z.TTL/time.Millisecond))
+	if err != nil {
+		err = msgp.WrapError(err, "TTL")
+		return
+	}
+	// string "timestamp"
+	o = append(o, 0xa9, 0x74, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70)
+	o, err = z.Timestamp.MarshalMsg(o)
+	if err != nil {
+		err = msgp.WrapError(err, "Timestamp")
+		return
+	}
 	// string "expire_at"
 	o = append(o, 0xa9, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x5f, 0x61, 0x74)
 	if z.ExpireAt == nil {
@@ -154,10 +181,10 @@ func (z *Lease) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
-		case "key":
+		case "id":
 			z.ID, bts, err = msgp.ReadStringBytes(bts)
 			if err != nil {
-				err = msgp.WrapError(err, "Key")
+				err = msgp.WrapError(err, "ID")
 				return
 			}
 		case "ttl":
@@ -168,6 +195,12 @@ func (z *Lease) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 			z.TTL = time.Duration(v * int64(time.Millisecond))
+		case "timestamp":
+			bts, err = z.Timestamp.UnmarshalMsg(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Timestamp")
+				return
+			}
 		case "expire_at":
 			if msgp.IsNil(bts) {
 				bts, err = msgp.ReadNilBytes(bts)
@@ -199,7 +232,7 @@ func (z *Lease) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Lease) Msgsize() (s int) {
-	s = 1 + 4 + msgp.StringPrefixSize + len(z.ID) + 4 + msgp.Int64Size + 10
+	s = 1 + 3 + msgp.StringPrefixSize + len(z.ID) + 4 + msgp.Int64Size + 10 + z.Timestamp.Msgsize() + 10
 	if z.ExpireAt == nil {
 		s += msgp.NilSize
 	} else {

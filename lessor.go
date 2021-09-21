@@ -15,7 +15,7 @@ type Lessor struct {
 func (l *Lessor) Init() error {
 	provider := new(internal.LeaseProvider)
 	{
-		client, err := internal.CreateRedisClient(l.RedisOption)
+		client, err := CreateRedisClient(l.RedisOption)
 		if err != nil {
 			return err
 		}

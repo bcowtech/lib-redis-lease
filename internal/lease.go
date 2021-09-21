@@ -12,9 +12,10 @@ import (
 //_ go:generate msgp -tests=false
 
 type Lease struct {
-	ID       string        `json:"id"                   msg:"id"`
-	TTL      time.Duration `json:"ttl"                  msg:"ttl"`
-	ExpireAt *Timestamp    `json:"expire_at,omitempty"  msg:"expire_at"`
+	ID        string        `json:"id"                   msg:"id"`
+	TTL       time.Duration `json:"ttl"                  msg:"ttl"`
+	Timestamp Timestamp     `json:"timestamp"            msg:"timestamp"`
+	ExpireAt  *Timestamp    `json:"expire_at,omitempty"  msg:"expire_at"`
 }
 
 func (l *Lease) TimeToLive() *time.Duration {

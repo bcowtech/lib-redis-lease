@@ -20,7 +20,7 @@ type Watcher struct {
 	ClaimSensitivity     int
 	ClaimOccurrenceRate  int32
 	EventHandler         EventHandleProc
-	ErrorHandler         RedisErrorHandleProc
+	ErrorHandler         ErrorHandleProc
 
 	consumer *redis.Consumer
 }
