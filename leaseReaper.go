@@ -33,9 +33,10 @@ type LeaseReaper struct {
 
 	existedWorkspaces []string
 
-	ctx      context.Context
-	stopChan chan bool
-	wg       sync.WaitGroup
+	ctx       context.Context
+	stopChan  chan bool
+	pauseChan chan bool
+	wg        sync.WaitGroup
 
 	mutex       sync.Mutex
 	initialized bool
@@ -50,6 +51,10 @@ func (r *LeaseReaper) Init() {
 
 	if r.stopChan == nil {
 		r.stopChan = make(chan bool, 1)
+	}
+
+	if r.pauseChan == nil {
+		r.pauseChan = make(chan bool, 1)
 	}
 
 	r.provider = new(internal.LeaseProvider)
@@ -162,24 +167,36 @@ func (r *LeaseReaper) Start() error {
 			}
 		}()
 
+		var running bool = true
 		for {
 			select {
 			case <-r.stopChan:
 				return
 
-			case next := <-timer.C:
-				count, err := r.removeExpiredLeases(next)
-				if err != nil {
-					if !r.processRedisError(err) {
-						logger.Fatalf("%% Error: %v\n", err)
-						return
+			case pause := <-r.pauseChan:
+				if running != !pause {
+					running = !pause
+					if running {
+						timer.Reset(pollingTimeout)
 					}
 				}
+				break
 
-				if count > 0 {
-					timer.Reset(pollingTimeout)
-				} else {
-					timer.Reset(idlingTimeout)
+			case next := <-timer.C:
+				if running {
+					count, err := r.removeExpiredLeases(next)
+					if err != nil {
+						if !r.processRedisError(err) {
+							logger.Fatalf("%% Error: %v\n", err)
+							return
+						}
+					}
+
+					if count > 0 {
+						timer.Reset(pollingTimeout)
+					} else {
+						timer.Reset(idlingTimeout)
+					}
 				}
 			}
 		}
@@ -206,7 +223,21 @@ func (r *LeaseReaper) Stop() {
 		close(r.stopChan)
 	}
 
+	close(r.pauseChan)
+
 	r.wg.Wait()
+}
+
+func (r *LeaseReaper) Pause() {
+	if r.running {
+		r.pauseChan <- true
+	}
+}
+
+func (r *LeaseReaper) Resume() {
+	if r.running {
+		r.pauseChan <- false
+	}
 }
 
 func (r *LeaseReaper) isDuplicatedWorkspace(workspace string) bool {
@@ -233,34 +264,34 @@ func (r *LeaseReaper) processRedisError(err error) (disposed bool) {
 	return false
 }
 
-func (r *LeaseReaper) removeExpiredLeases(timestamp time.Time) (count int64, err error) {
+func (r *LeaseReaper) removeExpiredLeases(expireAt time.Time) (count int64, err error) {
 	var (
 		total           int64         = 0
 		attempts        int           = r.maxRetries
 		maxRetryBackoff time.Duration = r.maxRetryBackoff
 		minRetryBackoff time.Duration = r.minRetryBackoff
-		paused          bool          = false
+		retrying        bool          = false
 		lastErr         error
 	)
 	for _, v := range r.executors {
 		// reset the paused flag
-		paused = false
-		r.triggerOnProcess(v.workspace, v.eventSink, timestamp)
+		retrying = false
+		r.triggerOnProcess(v.workspace, v.eventSink, expireAt)
 		for attempt := 0; attempt <= attempts; attempt++ {
-			expired, err := v.Execute(timestamp)
+			expired, err := v.Execute(expireAt)
 			total = total + expired
 			if err == nil {
-				if paused {
-					paused = false
-					r.triggerOnResume(v.workspace, v.eventSink)
+				if retrying {
+					retrying = false
+					r.triggerOnRecover(v.workspace, v.eventSink)
 				}
 				break
 			}
 
 			if helper.IsRetriableError(err, true) {
-				if !paused {
-					paused = true
-					r.triggerOnPause(v.workspace, v.eventSink)
+				if !retrying {
+					retrying = true
+					r.triggerOnRetry(v.workspace, v.eventSink, expireAt)
 				}
 
 				if err := helper.Sleep(r.ctx, helper.RetryBackoff(attempts, minRetryBackoff, maxRetryBackoff)); err != nil {
@@ -275,32 +306,32 @@ func (r *LeaseReaper) removeExpiredLeases(timestamp time.Time) (count int64, err
 	return total, lastErr
 }
 
-func (r *LeaseReaper) triggerOnProcess(workspace, eventSink string, timestamp time.Time) {
+func (r *LeaseReaper) triggerOnProcess(workspace, eventSink string, expireAt time.Time) {
 	for _, h := range r.hooks {
-		h.OnProcess(workspace, eventSink, timestamp)
+		h.OnProcess(r, workspace, eventSink, expireAt)
 	}
 }
 
-func (r *LeaseReaper) triggerOnPause(workspace, eventSink string) {
+func (r *LeaseReaper) triggerOnRecover(workspace, eventSink string) {
 	for _, h := range r.hooks {
-		h.OnPause(workspace, eventSink)
+		h.OnRecover(r, workspace, eventSink)
 	}
 }
 
-func (r *LeaseReaper) triggerOnResume(workspace, eventSink string) {
+func (r *LeaseReaper) triggerOnRetry(workspace, eventSink string, expireAt time.Time) {
 	for _, h := range r.hooks {
-		h.OnResume(workspace, eventSink)
+		h.OnRetry(r, workspace, eventSink, expireAt)
 	}
 }
 
 func (r *LeaseReaper) triggerOnStart() {
 	for _, h := range r.hooks {
-		h.OnStart()
+		h.OnStart(r)
 	}
 }
 
 func (r *LeaseReaper) triggerOnStop() {
 	for _, h := range r.hooks {
-		h.OnStop()
+		h.OnStop(r)
 	}
 }

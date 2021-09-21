@@ -29,11 +29,11 @@ type (
 	StreamOffset = stream.StreamOffset
 
 	LeaseReaperHook interface {
-		OnPause(workspace, eventSink string)
-		OnProcess(workspace, eventSink string, timestamp time.Time)
-		OnResume(workspace, eventSink string)
-		OnStart()
-		OnStop()
+		OnProcess(sender *LeaseReaper, workspace, eventSink string, expireAt time.Time)
+		OnRecover(sender *LeaseReaper, workspace, eventSink string)
+		OnRetry(sender *LeaseReaper, workspace, eventSink string, expireAt time.Time)
+		OnStart(sender *LeaseReaper)
+		OnStop(sender *LeaseReaper)
 	}
 )
 
