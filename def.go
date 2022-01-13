@@ -24,8 +24,8 @@ type (
 	Timestamp = internal.Timestamp
 	LeaseArg  = internal.LeaseArg
 
-	RedisClient  = redis.Client
-	RedisOption  = redis.Options
+	RedisClient  = redis.UniversalClient
+	RedisOption  = redis.UniversalOptions
 	StreamOffset = stream.StreamOffset
 
 	LeaseReaperHook interface {

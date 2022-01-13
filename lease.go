@@ -11,6 +11,6 @@ func WithLimit(limit int) *LeaseArg {
 	}
 }
 
-func CreateRedisClient(opt *RedisOption) (*RedisClient, error) {
-	return helper.CreateRedisClient(opt)
+func CreateRedisUniversalClient(opt *RedisOption) (RedisClient, error) {
+	return helper.CreateRedisUniversalClient(opt)
 }

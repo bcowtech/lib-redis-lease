@@ -10,17 +10,17 @@ import (
 )
 
 type Watcher struct {
-	Group                string
-	Name                 string
-	RedisOption          *RedisOption
-	MaxInFlight          int64
-	MaxPollingTimeout    time.Duration
-	AutoClaimMinIdleTime time.Duration
-	IdlingTimeout        time.Duration
-	ClaimSensitivity     int
-	ClaimOccurrenceRate  int32
-	EventHandler         EventHandleProc
-	ErrorHandler         ErrorHandleProc
+	Group               string
+	Name                string
+	RedisOption         *RedisOption
+	MaxInFlight         int64
+	MaxPollingTimeout   time.Duration
+	ClaimMinIdleTime    time.Duration
+	IdlingTimeout       time.Duration
+	ClaimSensitivity    int
+	ClaimOccurrenceRate int32
+	EventHandler        EventHandleProc
+	ErrorHandler        ErrorHandleProc
 
 	consumer *redis.Consumer
 }
@@ -33,7 +33,7 @@ func (w *Watcher) Subscribe(streams ...StreamOffset) error {
 			RedisOption:             w.RedisOption,
 			MaxInFlight:             w.MaxInFlight,
 			MaxPollingTimeout:       w.MaxPollingTimeout,
-			AutoClaimMinIdleTime:    w.AutoClaimMinIdleTime,
+			ClaimMinIdleTime:        w.ClaimMinIdleTime,
 			IdlingTimeout:           w.IdlingTimeout,
 			ClaimSensitivity:        w.ClaimSensitivity,
 			ClaimOccurrenceRate:     w.ClaimOccurrenceRate,
@@ -82,11 +82,11 @@ func (w *Watcher) configRedisConsumerGroup(streams ...StreamOffset) error {
 
 	var handlers = []func(stream string) error{
 		func(stream string) error {
-			_, err := admin.CreateConsumerGroupAndStream(stream, group, redis.StartingStreamOffset)
+			_, err := admin.CreateConsumerGroupAndStream(stream, group, redis.StreamZeroOffset)
 			return err
 		},
 		func(stream string) error {
-			_, err := admin.AlterConsumerGroupOffset(stream, group, redis.StartingStreamOffset)
+			_, err := admin.SetConsumerGroupOffset(stream, group, redis.StreamZeroOffset)
 			return err
 		},
 	}

@@ -10,8 +10,8 @@ import (
 )
 
 func TestLeaseProvider_Put(t *testing.T) {
-	client, err := helper.CreateRedisClient(&redis.Options{
-		Addr: os.Getenv("REDIS_SERVER"),
+	client, err := helper.CreateRedisUniversalClient(&redis.UniversalOptions{
+		Addrs: []string{os.Getenv("REDIS_SERVER")},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -46,8 +46,8 @@ func TestLeaseProvider_Put(t *testing.T) {
 }
 
 func TestLeaseProvider_Get(t *testing.T) {
-	client, err := helper.CreateRedisClient(&redis.Options{
-		Addr: os.Getenv("REDIS_SERVER"),
+	client, err := helper.CreateRedisUniversalClient(&redis.UniversalOptions{
+		Addrs: []string{os.Getenv("REDIS_SERVER")},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -96,8 +96,8 @@ func TestLeaseProvider_Get(t *testing.T) {
 }
 
 func TestLeaseProvider_Delete(t *testing.T) {
-	client, err := helper.CreateRedisClient(&redis.Options{
-		Addr: os.Getenv("REDIS_SERVER"),
+	client, err := helper.CreateRedisUniversalClient(&redis.UniversalOptions{
+		Addrs: []string{os.Getenv("REDIS_SERVER")},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -139,8 +139,8 @@ func TestLeaseProvider_Delete(t *testing.T) {
 }
 
 func TestLeaseProvider_Renew(t *testing.T) {
-	client, err := helper.CreateRedisClient(&redis.Options{
-		Addr: os.Getenv("REDIS_SERVER"),
+	client, err := helper.CreateRedisUniversalClient(&redis.UniversalOptions{
+		Addrs: []string{os.Getenv("REDIS_SERVER")},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -180,8 +180,8 @@ func TestLeaseProvider_Renew(t *testing.T) {
 }
 
 func TestLeaseProvider_Expire(t *testing.T) {
-	client, err := helper.CreateRedisClient(&redis.Options{
-		Addr: os.Getenv("REDIS_SERVER"),
+	client, err := helper.CreateRedisUniversalClient(&redis.UniversalOptions{
+		Addrs: []string{os.Getenv("REDIS_SERVER")},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -209,8 +209,8 @@ func TestLeaseProvider_Expire(t *testing.T) {
 }
 
 func TestLeaseProvider_Expire_WithLimit(t *testing.T) {
-	client, err := helper.CreateRedisClient(&redis.Options{
-		Addr: os.Getenv("REDIS_SERVER"),
+	client, err := helper.CreateRedisUniversalClient(&redis.UniversalOptions{
+		Addrs: []string{os.Getenv("REDIS_SERVER")},
 	})
 	if err != nil {
 		t.Fatal(err)

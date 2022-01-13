@@ -6,8 +6,8 @@ import (
 	redis "github.com/go-redis/redis/v7"
 )
 
-func CreateRedisClient(opt *redis.Options) (*redis.Client, error) {
-	client := redis.NewClient(opt)
+func CreateRedisUniversalClient(opt *redis.UniversalOptions) (redis.UniversalClient, error) {
+	client := redis.NewUniversalClient(opt)
 	if client == nil {
 		return nil, fmt.Errorf("fail to create redis.Client")
 	}

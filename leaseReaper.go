@@ -135,12 +135,12 @@ func (r *LeaseReaper) Start() error {
 	var (
 		pollingTimeout time.Duration = r.PollingTimeout
 		idlingTimeout  time.Duration = r.IdlingTimeout
-		redisClient    *RedisClient
+		redisClient    RedisClient
 	)
 
 	// redisClient
 	{
-		client, err := CreateRedisClient(r.RedisOption)
+		client, err := CreateRedisUniversalClient(r.RedisOption)
 		if err != nil {
 			return err
 		}
